@@ -3,6 +3,7 @@ use std::ops::BitOr;
 
 pub mod parser;
 pub mod solver;
+pub mod preprocessing;
 
 #[derive(Debug, PartialEq)]
 pub enum Satisfiability {
@@ -23,16 +24,25 @@ impl BitOr for Satisfiability {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Variable(u64);
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Literal {
-    variable: Variable,
-    negated: bool,
+impl std::fmt::Display for Satisfiability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Satisfiability::Satisfiable => write!(f, "SATISFIABLE"),
+            Satisfiability::Unsatisfiable => write!(f, "UNSATISFIABLE"),
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub struct Variable(u64);
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Literal {
+    variable: Variable,
+    polarity: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct Clause(Vec<Literal>);
 
 #[derive(Debug)]
@@ -44,26 +54,28 @@ pub struct Cnf {
 impl Cnf {
     pub fn is_satisfied(&self, assignments: &Vec<Option<bool>>) -> Option<Satisfiability> {
         for clause in self.clauses.iter() {
+            let mut all_literals_assigned = true;
             let mut clause_satisfied = false;
 
             for literal in clause.0.iter() {
                 let assignment = assignments[(literal.variable.0 - 1) as usize];
 
-                match assignment {
-                    None => return None,
-                    Some(assignment) => {
-                        if assignment == literal.negated {
-                            continue;
-                        }
-
+                match (assignment, literal.polarity) {
+                    (Some(true), true) | (Some(false), false) => {
                         clause_satisfied = true;
                         break;
                     }
+                    (None, _) => {
+                        all_literals_assigned = false;
+                    }
+                    _ => {}
                 }
-            }    
+            }
 
-            if !clause_satisfied {
-                return Some(Satisfiability::Unsatisfiable);
+            match (all_literals_assigned, clause_satisfied) {
+                (true, false) => return Some(Satisfiability::Unsatisfiable),
+                (false, false) => return None,
+                _ => {}
             }
         }
 
@@ -77,13 +89,13 @@ impl Cnf {
             let mut unassigned_literals = vec![];
             let mut clause_satisfied = false;
 
-            for (index ,literal) in clause.0.iter().enumerate() {
+            for (index, literal) in clause.0.iter().enumerate() {
                 let assignment = assignments[(literal.variable.0 - 1) as usize];
 
                 match assignment {
                     None => unassigned_literals.push(index),
                     Some(assignment) => {
-                        if assignment == literal.negated {
+                        if assignment != literal.polarity {
                             continue;
                         }
 
@@ -115,21 +127,21 @@ mod tests {
                 Clause(vec![
                     Literal {
                         variable: Variable(1),
-                        negated: false,
+                        polarity: true,
                     },
                     Literal {
                         variable: Variable(2),
-                        negated: true,
+                        polarity: false,
                     },
                 ]),
                 Clause(vec![
                     Literal {
                         variable: Variable(2),
-                        negated: false,
+                        polarity: true,
                     },
                     Literal {
                         variable: Variable(3),
-                        negated: false,
+                        polarity: true,
                     },
                 ]),
             ],
@@ -162,21 +174,21 @@ mod tests {
                 Clause(vec![
                     Literal {
                         variable: Variable(1),
-                        negated: false,
+                        polarity: true,
                     },
                     Literal {
                         variable: Variable(2),
-                        negated: true,
+                        polarity: false,
                     },
                 ]),
                 Clause(vec![
                     Literal {
                         variable: Variable(2),
-                        negated: false,
+                        polarity: true,
                     },
                     Literal {
                         variable: Variable(3),
-                        negated: false,
+                        polarity: true,
                     },
                 ]),
             ],
@@ -195,16 +207,16 @@ mod tests {
             clauses: vec![
                 Clause(vec![Literal {
                     variable: Variable(1),
-                    negated: false,
+                    polarity: true,
                 }]),
                 Clause(vec![
                     Literal {
                         variable: Variable(1),
-                        negated: true,
+                        polarity: false,
                     },
                     Literal {
                         variable: Variable(2),
-                        negated: false,
+                        polarity: true,
                     },
                 ]),
             ],

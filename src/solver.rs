@@ -32,7 +32,16 @@ impl MinosSolver {
 
         let unit_propagations = self.cnf.get_unit_clauses(&self.assignments);
         for literal in unit_propagations.iter() { 
-            self.assignments[(literal.variable.0 - 1) as usize] = Some(!literal.negated);
+            //println!("Unit propagation: {}{}", if literal.polarity { "" } else { "-" }, literal.variable.0);
+
+            match self.assignments[(literal.variable.0 - 1) as usize] {
+                Some(assignment) => {
+                    if assignment != literal.polarity {
+                        return Satisfiability::Unsatisfiable;
+                    }
+                },
+                None => self.assignments[(literal.variable.0 - 1) as usize] = Some(literal.polarity),
+            }
         }
 
         match self.assignments.iter().position(|assignment| assignment.is_none()) {
@@ -40,19 +49,24 @@ impl MinosSolver {
                 self.assignments[variable_index] = Some(true);
                 let true_branch = self.dpll();
 
+                if true_branch == Satisfiability::Satisfiable {
+                    return Satisfiability::Satisfiable;
+                }
+
                 self.assignments[variable_index] = Some(false);
                 let false_branch = self.dpll();
 
                 self.assignments[variable_index] = None;
 
                 for literal in unit_propagations.iter() {
+                    //println!("Undoing unit propagation: {}{}", if !literal.polarity { "-" } else { "" }, literal.variable.0);
                     self.assignments[(literal.variable.0 - 1) as usize] = None;
                 }
 
-                return true_branch | false_branch;
+                return false_branch;
             },
             None => {
-                panic!("No unassigned variables but CNF is not satisfied");
+                return self.cnf.is_satisfied(&self.assignments).unwrap();
             }
         }
     }

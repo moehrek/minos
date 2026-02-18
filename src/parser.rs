@@ -13,8 +13,10 @@ impl Cnf {
 
         let mut dimacs_header = lines.next().unwrap().split_whitespace();
 
-        if dimacs_header.next().unwrap() != "p" {
-            return Err("Invalid DIMACS header".to_owned());
+        let first_token = dimacs_header.next().unwrap();
+
+        if first_token != "p" {
+            return Err(format!("Invalid DIMACS header: expected 'p', got '{}'", first_token));
         }
 
         let clause_format = dimacs_header
@@ -53,7 +55,7 @@ impl Cnf {
 
                     literals.push(Literal {
                         variable: Variable(raw_literal.abs() as u64),
-                        negated: raw_literal < 0,
+                        polarity: raw_literal > 0,
                     })
                 }
 
